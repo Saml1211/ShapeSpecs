@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="OnLoad">
+  <ribbon>
+    <tabs>
+      <tab id="tabShapeSpecs" label="ShapeSpecs">
+        <group id="grpPanel" label="Panel">
+          <button id="btnShowPanel" 
+                  label="Show Panel" 
+                  imageMso="ViewSideBySide" 
+                  size="large" 
+                  onAction="OnShowPanelClick" 
+                  screentip="Show ShapeSpecs Panel"
+                  supertip="Show the ShapeSpecs panel to view and edit specifications for the selected shape." />
+        </group>
+        <group id="grpEdit" label="Edit">
+          <button id="btnAddSpec" 
+                  label="Add Spec" 
+                  imageMso="TablePropertiesDialog" 
+                  size="large" 
+                  onAction="OnAddSpecClick"
+                  screentip="Add Specification"
+                  supertip="Add a new specification to the selected shape." />
+          <button id="btnAddAttachment" 
+                  label="Add Attachment" 
+                  imageMso="AttachItem" 
+                  size="large" 
+                  onAction="OnAddAttachmentClick"
+                  screentip="Add Attachment"
+                  supertip="Add a file attachment to the selected shape." />
+          <button id="btnAddNote" 
+                  label="Add Note" 
+                  imageMso="CreateComment" 
+                  size="large" 
+                  onAction="OnAddNoteClick"
+                  screentip="Add Note"
+                  supertip="Add a note to the selected shape." />
+        </group>
+        <group id="grpImportExport" label="Import/Export">
+          <button id="btnImport" 
+                  label="Import" 
+                  imageMso="ImportFromAccess" 
+                  size="normal" 
+                  onAction="OnImportClick"
+                  screentip="Import Specifications"
+                  supertip="Import specifications from a file." />
+          <button id="btnExport" 
+                  label="Export" 
+                  imageMso="ExportToExcel" 
+                  size="normal" 
+                  onAction="OnExportClick"
+                  screentip="Export Specifications"
+                  supertip="Export specifications to a file." />
+        </group>
+        <group id="grpSettings" label="Settings">
+          <button id="btnSettings" 
+                  label="Settings" 
+                  imageMso="AdvancedFileProperties" 
+                  size="normal" 
+                  onAction="OnSettingsClick"
+                  screentip="Settings"
+                  supertip="Configure ShapeSpecs settings." />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
