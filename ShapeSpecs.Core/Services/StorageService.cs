@@ -11,11 +11,39 @@ namespace ShapeSpecs.Core.Services
     /// <summary>
     /// Service for storing and retrieving shape metadata and attachments
     /// </summary>
-    public class StorageService
+    /// <remarks>
+    /// Storage Directory Structure:
+    ///
+    /// [BaseStoragePath]/
+    /// ├── Logs/
+    /// │   └── ShapeSpecs_YYYYMMDD.log
+    /// └── shapes/
+    ///     └── [ShapeId]/
+    ///         ├── metadata.json
+    ///         ├── images/
+    ///         │   ├── [AttachmentId].jpg
+    ///         │   └── [AttachmentId]_thumb.jpg
+    ///         ├── pdfs/
+    ///         │   └── [AttachmentId].pdf
+    ///         ├── documents/
+    ///         │   └── [AttachmentId].docx
+    ///         └── others/
+    ///             └── [AttachmentId].[ext]
+    ///
+    /// Where:
+    /// - BaseStoragePath: Configured storage location (typically in add-in directory or AppData)
+    /// - ShapeId: Format "{DocumentName}_{ShapeID}"
+    /// - AttachmentId: GUID generated for each attachment
+    /// - Attachments are organized by type (images, pdfs, documents, others)
+    /// - Thumbnails are created for image attachments with "_thumb" suffix
+    /// - All paths stored in metadata are relative to BaseStoragePath for portability
+    /// </remarks>
+    public class StorageService : IDisposable
     {
         private readonly string _baseStoragePath;
         private readonly JsonHelper _jsonHelper;
         private readonly FileHelper _fileHelper;
+        private bool _disposed = false;
 
         /// <summary>
         /// Creates a new instance of the StorageService
@@ -74,21 +102,52 @@ namespace ShapeSpecs.Core.Services
             {
                 // Get the absolute path to the metadata file
                 string metadataPath = Path.Combine(_baseStoragePath, metadataReference);
-                
+
+                // Check if the file exists - this is expected for new shapes
+                if (!File.Exists(metadataPath))
+                {
+                    // File doesn't exist - this is normal for a new shape, return new metadata
+                    return new ShapeMetadata
+                    {
+                        ShapeId = shapeId
+                    };
+                }
+
                 // Deserialize the metadata from the JSON file
                 var metadata = _jsonHelper.DeserializeFromFile<ShapeMetadata>(metadataPath);
-                
+
                 // Verify the shape ID matches
                 if (metadata.ShapeId != shapeId)
                 {
                     throw new InvalidOperationException($"Shape ID mismatch. Expected: {shapeId}, Found: {metadata.ShapeId}");
                 }
-                
+
                 return metadata;
             }
-            catch (Exception ex)
+            catch (FileNotFoundException)
             {
-                // If loading fails for any reason, return a new metadata object
+                // File not found - return new metadata (should be caught by File.Exists above, but defensive)
+                return new ShapeMetadata
+                {
+                    ShapeId = shapeId
+                };
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // Directory structure doesn't exist yet - return new metadata
+                return new ShapeMetadata
+                {
+                    ShapeId = shapeId
+                };
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Permission error - this is serious, don't mask it
+                throw new InvalidOperationException($"Access denied when loading metadata for shape {shapeId}: {ex.Message}", ex);
+            }
+            catch (JsonException ex)
+            {
+                // Corrupt JSON - return new metadata with error note so user can recover
                 return new ShapeMetadata
                 {
                     ShapeId = shapeId,
@@ -96,7 +155,28 @@ namespace ShapeSpecs.Core.Services
                     {
                         new Note
                         {
-                            Text = $"Error loading metadata: {ex.Message}",
+                            Text = $"Warning: Previous metadata was corrupted and could not be loaded. Error: {ex.Message}",
+                            Author = "System",
+                            Category = "Error",
+                            Priority = NotePriority.High
+                        }
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - log it and return new metadata with error note
+                // In a real application, this would be logged to a logging system
+                System.Diagnostics.Debug.WriteLine($"Unexpected error loading metadata for shape {shapeId}: {ex}");
+
+                return new ShapeMetadata
+                {
+                    ShapeId = shapeId,
+                    Notes = new List<Note>
+                    {
+                        new Note
+                        {
+                            Text = $"Error loading metadata: {ex.Message}. Previous data may be lost.",
                             Author = "System",
                             Category = "Error",
                             Priority = NotePriority.High
@@ -216,6 +296,15 @@ namespace ShapeSpecs.Core.Services
         }
 
         /// <summary>
+        /// Gets the base storage path used by this service
+        /// </summary>
+        /// <returns>The base storage path</returns>
+        public string GetBaseStoragePath()
+        {
+            return _baseStoragePath;
+        }
+
+        /// <summary>
         /// Gets a path relative to the base storage path
         /// </summary>
         /// <param name="fullPath">The absolute path</param>
@@ -225,10 +314,37 @@ namespace ShapeSpecs.Core.Services
             // Create a URI for the full path and the base path
             Uri fullPathUri = new Uri(fullPath);
             Uri basePathUri = new Uri(_baseStoragePath + Path.DirectorySeparatorChar);
-            
+
             // Return the relative path
             return Uri.UnescapeDataString(basePathUri.MakeRelativeUri(fullPathUri).ToString())
                 .Replace('/', Path.DirectorySeparatorChar);
+        }
+
+        /// <summary>
+        /// Disposes resources used by the StorageService
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected implementation of Dispose pattern
+        /// </summary>
+        /// <param name="disposing">True if disposing managed resources</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Dispose managed resources
+                // Currently no disposable resources, but this allows for future expansion
+            }
+
+            _disposed = true;
         }
     }
 }

@@ -82,9 +82,17 @@ namespace ShapeSpecs.Core.Services
         /// </summary>
         /// <param name="shape">The Visio shape</param>
         /// <returns>A unique identifier for the shape</returns>
+        /// <remarks>
+        /// LIMITATION: The shape ID is based on the document name and shape ID.
+        /// If the document is renamed, the shape ID will change and the association
+        /// with existing metadata will be lost. This is a known limitation of Phase 1.
+        /// Future enhancement: Consider persisting a GUID in the shape's custom properties
+        /// to maintain the association across document renames.
+        /// </remarks>
         private string GetShapeId(Shape shape)
         {
             // Use the shape's unique ID (or another suitable property) to generate a consistent ID
+            // NOTE: This will change if the document is renamed
             return $"{shape.Document.Name}_{shape.ID}";
         }
 

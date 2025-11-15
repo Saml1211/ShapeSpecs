@@ -32,6 +32,16 @@ namespace ShapeSpecs.Addin
         private Microsoft.Office.Interop.Visio.Application _visioApplication;
 
         /// <summary>
+        /// Constructor - initializes services early to support ribbon creation
+        /// </summary>
+        public ThisAddIn()
+        {
+            // Initialize services early because CreateRibbonExtensibilityObject()
+            // may be called before ThisAddIn_Startup()
+            InitializeServices();
+        }
+
+        /// <summary>
         /// Initialization code. Called when the add-in is loaded.
         /// </summary>
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
@@ -40,9 +50,6 @@ namespace ShapeSpecs.Addin
             {
                 // Store reference to Visio application
                 _visioApplication = this.Application;
-
-                // Initialize services and utilities
-                InitializeServices();
 
                 // Initialize UI components
                 InitializeUI();
@@ -71,11 +78,24 @@ namespace ShapeSpecs.Addin
                 // Unhook Visio events
                 UnhookEvents();
 
-                // Dispose any resources
+                // Dispose UI resources
                 if (_specsPaneHost != null)
                 {
                     _specsPaneHost.Dispose();
                     _specsPaneHost = null;
+                }
+
+                // Dispose services
+                if (_fileService != null)
+                {
+                    _fileService.Dispose();
+                    _fileService = null;
+                }
+
+                if (_storageService != null)
+                {
+                    _storageService.Dispose();
+                    _storageService = null;
                 }
 
                 LogInfo("ShapeSpecs add-in shut down successfully");
@@ -120,8 +140,7 @@ namespace ShapeSpecs.Addin
             _specsPaneHost.Width = 400;
             _specsPaneHost.Visible = true;
 
-            // Create ribbon controller
-            _ribbon = new ShapeSpecsRibbon(_shapeService, _fileService, _specsPanel);
+            // Note: Ribbon is created in CreateRibbonExtensibilityObject() method
         }
 
         /// <summary>
@@ -280,10 +299,25 @@ namespace ShapeSpecs.Addin
 
         /// <summary>
         /// Create the ribbon extension
+        /// Note: This is called by VSTO before ThisAddIn_Startup, but after the constructor.
+        /// Services are initialized in constructor, but _specsPanel is initialized in ThisAddIn_Startup.
+        /// The ribbon will receive the panel reference later when user interacts with it.
         /// </summary>
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
-            return _ribbon ?? (_ribbon = new ShapeSpecsRibbon(_shapeService, _fileService, _specsPanel));
+            if (_ribbon == null)
+            {
+                // Ensure panel is created if not already (may not be during early VSTO initialization)
+                if (_specsPanel == null)
+                {
+                    _specsPanel = new SpecsPanel();
+                    _specsPanel.Initialize(_shapeService, _fileService);
+                }
+
+                _ribbon = new ShapeSpecsRibbon(_shapeService, _fileService, _specsPanel);
+            }
+
+            return _ribbon;
         }
 
         #region VSTO generated code

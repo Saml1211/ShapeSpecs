@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Drawing.Drawing2D;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ShapeSpecs.Core.Utilities
 {
@@ -69,6 +70,45 @@ namespace ShapeSpecs.Core.Utilities
 
             // Copy the file
             File.Copy(sourcePath, destinationPath, overwrite);
+        }
+
+        /// <summary>
+        /// Asynchronously copies a file from one location to another
+        /// </summary>
+        /// <param name="sourcePath">Path to the source file</param>
+        /// <param name="destinationPath">Path to copy the file to</param>
+        /// <param name="overwrite">Whether to overwrite the destination if it exists</param>
+        public async Task CopyFileAsync(string sourcePath, string destinationPath, bool overwrite = true)
+        {
+            if (string.IsNullOrEmpty(sourcePath))
+                throw new ArgumentException("Source path cannot be null or empty", nameof(sourcePath));
+
+            if (string.IsNullOrEmpty(destinationPath))
+                throw new ArgumentException("Destination path cannot be null or empty", nameof(destinationPath));
+
+            if (!File.Exists(sourcePath))
+                throw new FileNotFoundException("Source file not found", sourcePath);
+
+            // Create the destination directory if it doesn't exist
+            string destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrEmpty(destinationDirectory) && !Directory.Exists(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            // If destination exists and we're not overwriting, throw exception
+            if (!overwrite && File.Exists(destinationPath))
+            {
+                throw new IOException($"Destination file already exists: {destinationPath}");
+            }
+
+            // Copy the file asynchronously using streams
+            const int bufferSize = 81920; // 80KB buffer
+            using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, useAsync: true))
+            using (var destinationStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize, useAsync: true))
+            {
+                await sourceStream.CopyToAsync(destinationStream, bufferSize).ConfigureAwait(false);
+            }
         }
 
         /// <summary>

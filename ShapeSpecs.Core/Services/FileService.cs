@@ -1,7 +1,8 @@
 using System;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ShapeSpecs.Core.Models;
 using ShapeSpecs.Core.Utilities;
 
@@ -10,10 +11,12 @@ namespace ShapeSpecs.Core.Services
     /// <summary>
     /// Service for managing file operations related to attachments
     /// </summary>
-    public class FileService
+    public class FileService : IDisposable
     {
         private readonly FileHelper _fileHelper;
         private readonly StorageService _storageService;
+        private static readonly HttpClient _httpClient = new HttpClient();
+        private bool _disposed = false;
 
         /// <summary>
         /// Creates a new instance of the FileService
@@ -58,11 +61,11 @@ namespace ShapeSpecs.Core.Services
         /// <param name="url">URL of the file to import</param>
         /// <param name="attachmentName">Optional custom name for the attachment</param>
         /// <returns>The updated metadata with the attachment added</returns>
-        public ShapeMetadata ImportFileFromUrl(ShapeMetadata metadata, string url, string attachmentName = null)
+        public async Task<ShapeMetadata> ImportFileFromUrlAsync(ShapeMetadata metadata, string url, string attachmentName = null)
         {
             if (metadata == null)
                 throw new ArgumentNullException(nameof(metadata));
-            
+
             if (string.IsNullOrEmpty(url))
                 throw new ArgumentException("URL cannot be null or empty", nameof(url));
 
@@ -70,13 +73,18 @@ namespace ShapeSpecs.Core.Services
             {
                 // Create a temporary file to download to
                 string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                
-                // Download the file
-                using (var client = new WebClient())
+
+                // Download the file using HttpClient (modern replacement for WebClient)
+                using (var response = await _httpClient.GetAsync(url).ConfigureAwait(false))
                 {
-                    client.DownloadFile(url, tempFile);
+                    response.EnsureSuccessStatusCode();
+
+                    using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await response.Content.CopyToAsync(fileStream).ConfigureAwait(false);
+                    }
                 }
-                
+
                 try
                 {
                     // Determine a filename from the URL if no name was provided
@@ -84,7 +92,7 @@ namespace ShapeSpecs.Core.Services
                     {
                         attachmentName = Path.GetFileName(new Uri(url).LocalPath);
                     }
-                    
+
                     // Import the downloaded file
                     return ImportFile(metadata, tempFile, attachmentName);
                 }
@@ -96,6 +104,10 @@ namespace ShapeSpecs.Core.Services
                         File.Delete(tempFile);
                     }
                 }
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new Exception($"Failed to download file from URL: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
@@ -217,6 +229,34 @@ namespace ShapeSpecs.Core.Services
             
             // Default to Other
             return AttachmentType.Other;
+        }
+
+        /// <summary>
+        /// Disposes resources used by the FileService
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected implementation of Dispose pattern
+        /// </summary>
+        /// <param name="disposing">True if disposing managed resources</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Dispose managed resources
+                // Note: HttpClient is static and shared, so we don't dispose it here
+                // Future disposable resources can be added here
+            }
+
+            _disposed = true;
         }
     }
 }
