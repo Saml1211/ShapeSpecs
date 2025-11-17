@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using ShapeSpecs.Core.Models;
 using ShapeSpecs.Core.Services;
+using ShapeSpecs.Core.Utilities;
 
 namespace ShapeSpecs.UI.Forms
 {
@@ -364,6 +366,123 @@ namespace ShapeSpecs.UI.Forms
             return $"{size:0.##} {suffixes[suffixIndex]}";
         }
 
+        /// <summary>
+        /// Exports the current shape metadata to a JSON file
+        /// </summary>
+        public void ExportSpecifications()
+        {
+            if (_currentMetadata == null)
+            {
+                MessageBox.Show("No shape selected.", "ShapeSpecs",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                using (var saveFileDialog = new SaveFileDialog())
+                {
+                    saveFileDialog.Title = "Export Shape Specifications";
+                    saveFileDialog.Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*";
+                    saveFileDialog.DefaultExt = "json";
+                    saveFileDialog.FileName = $"ShapeSpecs_{_currentMetadata.ShapeId}_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+
+                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        var jsonHelper = new JsonHelper();
+                        jsonHelper.SerializeToFile(_currentMetadata, saveFileDialog.FileName);
+
+                        MessageBox.Show($"Specifications exported successfully to:\n{saveFileDialog.FileName}",
+                            "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error exporting specifications: {ex.Message}", "Export Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Imports shape metadata from a JSON file
+        /// </summary>
+        public void ImportSpecifications()
+        {
+            if (_currentMetadata == null)
+            {
+                MessageBox.Show("No shape selected.", "ShapeSpecs",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                using (var openFileDialog = new OpenFileDialog())
+                {
+                    openFileDialog.Title = "Import Shape Specifications";
+                    openFileDialog.Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*";
+                    openFileDialog.FilterIndex = 1;
+
+                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        var result = MessageBox.Show(
+                            "Import will merge the imported specifications with existing ones.\n\n" +
+                            "Existing specifications with the same name will be overwritten.\n" +
+                            "Continue?",
+                            "Confirm Import",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+
+                        if (result == DialogResult.Yes)
+                        {
+                            var jsonHelper = new JsonHelper();
+                            var importedMetadata = jsonHelper.DeserializeFromFile<ShapeMetadata>(openFileDialog.FileName);
+
+                            // Merge text specifications
+                            foreach (var spec in importedMetadata.TextSpecifications)
+                            {
+                                _currentMetadata.TextSpecifications[spec.Key] = spec.Value;
+                            }
+
+                            // Merge notes
+                            foreach (var note in importedMetadata.Notes)
+                            {
+                                _currentMetadata.Notes.Add(note);
+                            }
+
+                            // Update shape type and model if not set
+                            if (string.IsNullOrEmpty(_currentMetadata.DeviceType) && !string.IsNullOrEmpty(importedMetadata.DeviceType))
+                            {
+                                _currentMetadata.DeviceType = importedMetadata.DeviceType;
+                            }
+
+                            if (string.IsNullOrEmpty(_currentMetadata.Model) && !string.IsNullOrEmpty(importedMetadata.Model))
+                            {
+                                _currentMetadata.Model = importedMetadata.Model;
+                            }
+
+                            // Update timestamp
+                            _currentMetadata.LastModified = DateTime.Now;
+
+                            // Update the UI
+                            UpdateUI();
+
+                            MessageBox.Show($"Specifications imported successfully.\n\n" +
+                                $"Text Specifications: {importedMetadata.TextSpecifications.Count}\n" +
+                                $"Notes: {importedMetadata.Notes.Count}",
+                                "Import Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error importing specifications: {ex.Message}", "Import Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         #region Event Handlers
 
         private void BtnAddSpec_Click(object sender, EventArgs e)
@@ -375,23 +494,100 @@ namespace ShapeSpecs.UI.Forms
 
         private void BtnAddAttachment_Click(object sender, EventArgs e)
         {
-            // Placeholder for adding an attachment
-            MessageBox.Show("Add Attachment functionality will be implemented in Phase 2.", "Not Implemented",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (_currentMetadata == null)
+            {
+                MessageBox.Show("No shape selected.", "ShapeSpecs",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Show file dialog to select attachment
+                using (var openFileDialog = new OpenFileDialog())
+                {
+                    openFileDialog.Title = "Select File to Attach";
+                    openFileDialog.Filter = "All Files (*.*)|*.*|Images (*.jpg;*.png;*.gif;*.bmp)|*.jpg;*.png;*.gif;*.bmp|PDF Files (*.pdf)|*.pdf|Documents (*.doc;*.docx;*.xls;*.xlsx)|*.doc;*.docx;*.xls;*.xlsx";
+                    openFileDialog.FilterIndex = 1;
+
+                    if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Import the file
+                        _currentMetadata = _fileService.ImportFile(_currentMetadata, openFileDialog.FileName);
+
+                        // Update the UI
+                        UpdateAttachments();
+
+                        MessageBox.Show($"File '{Path.GetFileName(openFileDialog.FileName)}' attached successfully.",
+                            "ShapeSpecs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error attaching file: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnViewAttachment_Click(object sender, EventArgs e)
         {
-            // Placeholder for viewing an attachment
-            MessageBox.Show("View Attachment functionality will be implemented in Phase 2.", "Not Implemented",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (sender is Button button && button.Tag is Attachment attachment)
+            {
+                try
+                {
+                    // Get the full path to the attachment
+                    string attachmentPath = _fileService.GetAttachmentPath(_currentMetadata, attachment.Id);
+
+                    if (!File.Exists(attachmentPath))
+                    {
+                        MessageBox.Show("Attachment file not found.", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    // Open the file with the default application
+                    System.Diagnostics.Process.Start(attachmentPath);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error opening attachment: {ex.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
         }
 
         private void BtnDeleteAttachment_Click(object sender, EventArgs e)
         {
-            // Placeholder for deleting an attachment
-            MessageBox.Show("Delete Attachment functionality will be implemented in Phase 2.", "Not Implemented",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (sender is Button button && button.Tag is Attachment attachment)
+            {
+                try
+                {
+                    // Confirm deletion
+                    var result = MessageBox.Show(
+                        $"Are you sure you want to delete the attachment '{attachment.Name}'?",
+                        "Confirm Delete",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        // Delete the attachment
+                        _currentMetadata = _fileService.DeleteAttachment(_currentMetadata, attachment.Id);
+
+                        // Update the UI
+                        UpdateAttachments();
+
+                        MessageBox.Show("Attachment deleted successfully.", "ShapeSpecs",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error deleting attachment: {ex.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
         }
 
         private void BtnAddNote_Click(object sender, EventArgs e)

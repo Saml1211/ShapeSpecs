@@ -112,9 +112,44 @@ namespace ShapeSpecs.UI.Ribbon
         /// <param name="control">The ribbon control that was clicked</param>
         public void OnAddAttachmentClick(Office.IRibbonControl control)
         {
-            // This functionality will be implemented in Phase 2
-            System.Windows.Forms.MessageBox.Show("Add Attachment functionality will be implemented in Phase 2.", 
-                "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+            // Check if there's a selected shape
+            var application = Globals.ThisAddIn.Application;
+            if (application.ActiveWindow.Selection.Count == 0)
+            {
+                System.Windows.Forms.MessageBox.Show("Please select a shape first.",
+                    "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Trigger the add attachment functionality
+            using (var openFileDialog = new System.Windows.Forms.OpenFileDialog())
+            {
+                openFileDialog.Title = "Select File to Attach";
+                openFileDialog.Filter = "All Files (*.*)|*.*|Images (*.jpg;*.png;*.gif;*.bmp)|*.jpg;*.png;*.gif;*.bmp|PDF Files (*.pdf)|*.pdf|Documents (*.doc;*.docx;*.xls;*.xlsx)|*.doc;*.docx;*.xls;*.xlsx";
+                openFileDialog.FilterIndex = 1;
+
+                if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    try
+                    {
+                        var shape = application.ActiveWindow.Selection[1];
+                        var metadata = _shapeService.GetShapeMetadata(shape);
+
+                        metadata = _fileService.ImportFile(metadata, openFileDialog.FileName);
+                        _shapeService.SaveShapeMetadata(shape, metadata);
+
+                        _specPanel.UpdateForShape(shape);
+
+                        System.Windows.Forms.MessageBox.Show($"File '{Path.GetFileName(openFileDialog.FileName)}' attached successfully.",
+                            "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Windows.Forms.MessageBox.Show($"Error attaching file: {ex.Message}", "Error",
+                            System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -134,9 +169,21 @@ namespace ShapeSpecs.UI.Ribbon
         /// <param name="control">The ribbon control that was clicked</param>
         public void OnImportClick(Office.IRibbonControl control)
         {
-            // This functionality will be implemented in Phase 2
-            System.Windows.Forms.MessageBox.Show("Import functionality will be implemented in Phase 2.", 
-                "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+            // Check if there's a selected shape
+            var application = Globals.ThisAddIn.Application;
+            if (application.ActiveWindow.Selection.Count == 0)
+            {
+                System.Windows.Forms.MessageBox.Show("Please select a shape first.",
+                    "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Trigger the import functionality through the panel
+            _specPanel.ImportSpecifications();
+
+            // Update the panel with the current shape
+            var shape = application.ActiveWindow.Selection[1];
+            _specPanel.UpdateForShape(shape);
         }
 
         /// <summary>
@@ -145,9 +192,17 @@ namespace ShapeSpecs.UI.Ribbon
         /// <param name="control">The ribbon control that was clicked</param>
         public void OnExportClick(Office.IRibbonControl control)
         {
-            // This functionality will be implemented in Phase 2
-            System.Windows.Forms.MessageBox.Show("Export functionality will be implemented in Phase 2.", 
-                "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+            // Check if there's a selected shape
+            var application = Globals.ThisAddIn.Application;
+            if (application.ActiveWindow.Selection.Count == 0)
+            {
+                System.Windows.Forms.MessageBox.Show("Please select a shape first.",
+                    "ShapeSpecs", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Trigger the export functionality through the panel
+            _specPanel.ExportSpecifications();
         }
 
         /// <summary>
