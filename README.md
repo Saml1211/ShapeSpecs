@@ -1,6 +1,8 @@
 # ShapeSpecs Visio Add-in
 
-ShapeSpecs is a Microsoft Visio add-in designed to enhance AV engineering workflows by attaching technical specifications and other documentation to AV device shapes in Visio diagrams.
+**Have you ever spent hours hunting through PDF spec sheets to find the right cable type, mounting depth, or power draw for the AV device you just placed in a Visio diagram?** ShapeSpecs solves that by letting you attach technical specifications, notes, and file attachments directly to your AV device shapes — so the info lives with the diagram.
+
+Built for AV systems engineers who use Visio as their primary design tool, ShapeSpecs adds a dockable panel that surfaces device specs the moment you select a shape. No more context-switching between your Visio drawing and a folder of product datasheets.
 
 ## Project Overview
 
